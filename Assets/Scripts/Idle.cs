@@ -7,23 +7,35 @@ public class Idle : IState
 {
     FSM _fsm;
 
-    public Idle(FSM fsm)
+    private float _timer;
+    private float _restTime;
+
+    
+    public Idle(FSM fsm, float restTime)
     {
         _fsm = fsm;
+        _restTime = restTime;
     }
 
     public void OnEnter()
     {
-        throw new System.NotImplementedException();
+        _timer = 0;
+        Debug.Log("Enter Idle");
     }
 
     public void OnExit()
     {
-        throw new System.NotImplementedException();
+        Debug.Log("Exit Idle");
+        
     }
 
     public void OnUpdate()
     {
-        throw new System.NotImplementedException();
+        _timer += Time.deltaTime;
+
+        if (_timer > _restTime)
+            _fsm.ChangeState("Patrol");
+        
+
     }
 }
