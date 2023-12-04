@@ -9,32 +9,40 @@ public class Idle : IState
 
     private float _timer;
     private float _restTime;
-
+    Hunter _hunter;
     
-    public Idle(FSM fsm, float restTime)
+    public Idle(FSM fsm, float restTime, Hunter hunter)
     {
         _fsm = fsm;
         _restTime = restTime;
+        _hunter = hunter;
+
     }
 
     public void OnEnter()
     {
         _timer = 0;
-        Debug.Log("Enter Idle");
+        
+        
     }
 
     public void OnExit()
     {
-        Debug.Log("Exit Idle");
-        
     }
 
     public void OnUpdate()
     {
         _timer += Time.deltaTime;
 
+        if(_hunter.Velocity.magnitude != 0)
+            _hunter.AddForce(_hunter.CalculateSteering(-_hunter.Velocity));
+
         if (_timer > _restTime)
+        {
+            _timer = 0;
+            _hunter.stamina = _hunter.maxStamina;
             _fsm.ChangeState("Patrol");
+        }
         
 
     }

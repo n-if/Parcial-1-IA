@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class FSM : MonoBehaviour
+public class FSM
 {
     Dictionary<string, IState> _states = new Dictionary<string, IState>();
 

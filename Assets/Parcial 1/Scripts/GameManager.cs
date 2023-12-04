@@ -12,12 +12,26 @@ public class GameManager : MonoBehaviour
     [Range(0, 4f)]
     public float separationWeight, cohesionWeight, alignmentWeight = 1;
 
+    public GameObject foodPrefab;
+    public float foodSpawnRate;
+    private float _timer;
     private void Awake()
     {
         if (Instance == null)
             Instance = this;
         else
             Destroy(this);
+    }
+
+    private void Update()
+    {
+        _timer += Time.deltaTime;
+
+        if (_timer > foodSpawnRate)
+        {
+            SpawnFood();
+            _timer = 0;
+        }
     }
 
     public Vector3 ApplyBounds(Vector3 pos)
@@ -33,6 +47,18 @@ public class GameManager : MonoBehaviour
             pos.z = height;
 
         return pos;
+    }
+
+    private float randomPosX, randomPosZ;
+    private Vector3 randomPos;
+    public void SpawnFood()
+    {
+        randomPosX = Random.Range(-width, width);
+        randomPosZ = Random.Range(-height, height);
+
+        randomPos = new Vector3 (randomPosX, 0, randomPosZ);
+
+        Instantiate(foodPrefab, randomPos, Quaternion.identity);
     }
 
     private void OnDrawGizmos()

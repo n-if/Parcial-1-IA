@@ -6,8 +6,14 @@ public class Boid : MonoBehaviour
 {
     private Vector3 _velocity;
     public float maxVelocity;
-    public float maxForce;
-    public float separationRadius, viewRadius;
+    public float maxForce, flockingMaxForce, arriveMaxForce, evadeMaxForce;
+    public float separationRadius, viewRadius, arriveRadius, lookingRadius;
+
+    private Transform _closestPosition;
+
+    public Hunter hunter;
+
+    public Vector3 Velocity { get { return _velocity; } }
 
     private void Start()
     {
@@ -16,19 +22,70 @@ public class Boid : MonoBehaviour
         AddForce(new Vector3(randomX, 0, randomZ) * maxVelocity);
 
 
-
         GameManager.Instance.boids.Add(this);
-
     }
 
+    int closest;
     private void Update()
     {
-        Flocking();
-        transform.position = GameManager.Instance.ApplyBounds(transform.position + _velocity * Time.deltaTime);
+        //AddForce(Arrive(target.position));
+        //
+        //transform.position = GameManager.Instance.ApplyBounds(transform.position + _velocity * Time.deltaTime);
+        //transform.forward = _velocity;
 
-        transform.forward = _velocity;
+
+
+        closest = ClosestEntity();
+
+        Debug.Log(closest);
+
+        switch (closest)
+        {
+            case 0:
+                //evade
+
+                Debug.Log("Evadae");
+                
+
+                if (maxForce != evadeMaxForce)
+                    maxForce = evadeMaxForce;
+
+                AddForce(Evade(hunter.transform.position + hunter.Velocity));
+
+                transform.position = GameManager.Instance.ApplyBounds(transform.position + _velocity * Time.deltaTime);
+                transform.forward = _velocity;
+
+                break;
+
+            case 1:
+                if (maxForce != arriveMaxForce)
+                    maxForce = arriveMaxForce;
+
+                AddForce(Arrive(_closestPosition.position));
+
+                transform.position = GameManager.Instance.ApplyBounds(transform.position + _velocity * Time.deltaTime);
+                transform.forward = _velocity;
+                break;
+
+            case 2:
+
+                if (maxForce != flockingMaxForce)
+                    maxForce = flockingMaxForce;
+
+                Flocking();
+                transform.position = GameManager.Instance.ApplyBounds(transform.position + _velocity * Time.deltaTime);
+
+                transform.forward = _velocity;
+                break;
+
+            default:
+                Debug.LogError("Closest out of index.");
+                break;
+        }
+
     }
 
+    #region Flocking
     private void Flocking()
     {
         AddForce(Separation(GameManager.Instance.boids, separationRadius) * GameManager.Instance.separationWeight);
@@ -44,7 +101,7 @@ public class Boid : MonoBehaviour
         {
             var dir = boid.transform.position - transform.position;
 
-            if (dir.magnitude > separationRadius || boid == this)
+            if (dir.magnitude > radius || boid == this)
                 continue;
 
             desired -= dir;
@@ -61,16 +118,43 @@ public class Boid : MonoBehaviour
 
     }
 
+    private Vector3 Alignment(List<Boid> boids, float radius)
+    {
+        var desired = Vector3.zero;
+        int count = 0;
+
+        foreach (var boid in boids)
+        {
+            if (boid == this)
+                continue;
+
+            if (Vector3.Distance(transform.position, boid.transform.position) <= radius)
+            {
+                desired += boid._velocity;
+                count++;
+            }
+        }
+
+        if (count <= 0)
+            return Vector3.zero;
+
+        desired /= count;
+        desired.Normalize();
+        desired *= maxVelocity;
+
+        return CalculateSteering(desired);
+    }
+
     private Vector3 Cohesion(List<Boid> boids, float radius)
     {
-        Vector3 desired = Vector3.zero;
+        Vector3 desired = transform.position;
         int count = 0;
 
         foreach (var item in boids)
         {
             var dist = Vector3.Distance(transform.position, item.transform.position);
 
-            if(dist > radius || item == this)
+            if (dist > radius || item == this)
                 continue;
 
             desired += item.transform.position;
@@ -88,36 +172,10 @@ public class Boid : MonoBehaviour
         return CalculateSteering(desired);
     }
 
-    private Vector3 Alignment(List<Boid> boids, float radius)
-    {
-        var desired = Vector3.zero;
-        int count = 0;
+    #endregion
 
+    #region Movement
 
-
-        foreach (var boid in boids)
-        {
-            if (boid == this)
-                continue;
-
-            if (Vector3.Distance(transform.position, boid.transform.position) <= radius)
-            {
-                desired += boid._velocity;
-                count++;
-            }
-
-
-        }
-        
-        if (count <= 0)
-            return Vector3.zero;
-
-        desired /= count;
-        desired.Normalize();
-        desired *= maxVelocity;
-
-        return CalculateSteering(desired);
-    }
 
     public void AddForce(Vector3 dir)
     {
@@ -131,14 +189,102 @@ public class Boid : MonoBehaviour
         steering = Vector3.ClampMagnitude(steering, maxForce);
         return steering;
     }
+
+    Vector3 Arrive(Vector3 target)
+    {
+        var dist = Vector3.Distance(transform.position, target);
+
+        if (dist > arriveRadius)
+            return Seek(target);
+
+        var desired = target - transform.position;
+        desired.Normalize();
+        desired *= maxVelocity * (dist / arriveRadius);
+
+
+        return CalculateSteering(desired);
+    }
+
+    Vector3 Seek(Vector3 target)
+    {
+        var desired = target - transform.position;
+        desired.Normalize();
+        desired *= maxVelocity;
+
+        return CalculateSteering(desired);
+    }
+
+
+    Vector3 Evade(Vector3 target)
+    {
+        var desired = transform.position - target;
+        desired.Normalize();
+        desired *= maxVelocity;
+
+        return CalculateSteering(desired);
+    }
+    #endregion
+
+    #region Closest
+    private float _closestDistance;
+    private GameObject _closestEntity;
+    private int ClosestEntity()
+    {
+        Collider[] collidersEnRango = Physics.OverlapSphere(transform.position, lookingRadius);
+
+        _closestDistance = Mathf.Infinity;
+        _closestEntity = null;
+        foreach (var col in collidersEnRango)
+        {
+            GameObject obj = col.gameObject;
+
+            if (obj.GetComponent<Boid>())
+                continue;
+
+            if (obj.GetComponent<Hunter>())
+            {
+                _closestPosition = obj.transform;
+                return 0;
+            }
+
+            float distance = (obj.transform.position - gameObject.transform.position).magnitude;
+            if (distance < _closestDistance)
+            {
+                _closestDistance = distance;
+                _closestEntity = obj;
+            }
+        }
+        if (!_closestEntity)
+            return 2;
+        else if (_closestEntity.GetComponent<Food>())
+        {
+            _closestPosition = _closestEntity.transform;
+            return 1;
+        }
+        else
+            return 2;
+
+    }
+
+    #endregion
+
+    public void Die()
+    {
+        Debug.Log("me mueroo");
+        GameManager.Instance.boids.Remove(this);
+        Destroy(gameObject);
+    }
+
     private void OnDrawGizmos()
     {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, separationRadius);
+        //Gizmos.color = Color.yellow;
+        //Gizmos.DrawWireSphere(transform.position, separationRadius);
+        //
+        //Gizmos.color = Color.blue;
+        //Gizmos.DrawWireSphere(transform.position, viewRadius);
 
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireSphere(transform.position, viewRadius);
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, lookingRadius);
 
-        
     }
 }

@@ -8,45 +8,56 @@ public class Patrol : IState
     FSM _fsm;
     Transform[] _waypoints;
     Transform _hunterTransform;
-    float _maxVelocity, _maxForce, _chaseRadius;
+    
 
-    public Patrol(FSM fsm, Transform[] waypoints, Transform hunterTr, float maxVel, float maxForce, float chaseRadius)
+    Hunter _hunter;
+    int currentWaypoint = 0;
+
+
+    public Patrol(FSM fsm, Transform[] waypoints, Transform hunterTr, Hunter hunter)
     {
         _fsm = fsm;
         _waypoints = waypoints;
 
         _hunterTransform = hunterTr;
-        _maxVelocity = maxVel;
-        _maxForce = maxForce;
-        _chaseRadius = chaseRadius;
+
+        _hunter = hunter;
     }
 
     public void OnEnter()
     {
-        Debug.Log("Enter Patrol");
+        //Debug.Log("Enter Patrol");
     }
 
     public void OnUpdate()
     {
-        Collider[] boidsInRange = Physics.OverlapSphere(_hunterTransform.position, _chaseRadius);
-        if (boidsInRange.Length != 0)
+        _hunter.stamina -= Time.deltaTime;
+        if (_hunter.stamina < 0)
+            _fsm.ChangeState("Idle");
+
+
+        if (_hunter.GetClosestBoid())
             _fsm.ChangeState("Chase");
+
         else
         {
+            Vector3 dir = _waypoints[currentWaypoint].position - _hunterTransform.position;
+            if (dir.magnitude <= 0.5f)
+            {
+                currentWaypoint++;
+                if (currentWaypoint >= _waypoints.Length)
+                    currentWaypoint = 0;
+            }
+            _hunter.AddForce(_hunter.CalculateSteering(dir));
 
         }
-        //pregunto si está en rango --> _fsm.ChangeState("Chase")
-        //else --> Patrullo
-
-
-
     }
 
     public void OnExit()
     {
-        Debug.Log("Exit Patrol");
+        //Debug.Log("Exit Patrol");
     }
 
-   
+
 
 }
